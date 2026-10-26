@@ -1,0 +1,87 @@
+[
+  {
+    "cve_id": "CVE-2011-2523",
+    "cvss_score": 9.8,
+    "products": ["vsftpd"],
+    "affected": [{"min_version": "2.3.4", "max_version_exclusive": "2.3.5"}],
+    "summary": "vsftpd 2.3.4 distribution tarball contained a backdoor that opens a command shell on a high TCP port.",
+    "exploit_path": "Unauthenticated attacker triggers the backdoor during FTP login, then connects to the spawned listener for remote command execution as the ftp daemon user.",
+    "remediation": "Verify that vsftpd 2.3.4 is genuinely installed and where the package came from. If it is, replace it with a vendor-packaged, signature-verified release and review the host for signs of compromise."
+  },
+  {
+    "cve_id": "CVE-2021-41773",
+    "cvss_score": 7.5,
+    "products": ["apache httpd"],
+    "affected": [{"min_version": "2.4.49", "max_version_exclusive": "2.4.50"}],
+    "summary": "Path traversal in Apache HTTP Server 2.4.49 allows reading files outside the document root; can escalate to code execution when CGI is enabled.",
+    "exploit_path": "Unauthenticated HTTP request with encoded traversal sequences reads arbitrary files (config, credentials) and, if mod_cgi is active, may reach remote code execution.",
+    "remediation": "Upgrade Apache httpd to 2.4.54 or later (2.4.50 only partially fixed the issue); review access logs for traversal attempts."
+  },
+  {
+    "cve_id": "CVE-2021-42013",
+    "cvss_score": 9.8,
+    "products": ["apache httpd"],
+    "affected": [{"min_version": "2.4.49", "max_version_exclusive": "2.4.51"}],
+    "summary": "Incomplete fix for CVE-2021-41773 in Apache 2.4.49/2.4.50 keeps path traversal and RCE possible via double-encoded sequences.",
+    "exploit_path": "Same path-traversal primitive as CVE-2021-41773 using double URL-encoding; with CGI enabled it chains to unauthenticated remote code execution.",
+    "remediation": "Upgrade Apache httpd to 2.4.54 or later; review access logs for traversal attempts."
+  },
+  {
+    "cve_id": "CVE-2018-15473",
+    "cvss_score": 5.3,
+    "products": ["openssh"],
+    "affected": [{"max_version_exclusive": "7.8"}],
+    "summary": "OpenSSH before 7.8 leaks whether a username exists through differing responses to malformed authentication requests.",
+    "exploit_path": "Remote attacker enumerates valid account names, narrowing the target list for password-guessing or credential-stuffing.",
+    "remediation": "Upgrade OpenSSH to a currently supported release; enforce key-only authentication and rate-limit/ban repeated failures (fail2ban or equivalent)."
+  },
+  {
+    "cve_id": "CVE-2016-10009",
+    "cvss_score": 7.3,
+    "products": ["openssh"],
+    "affected": [{"max_version_exclusive": "7.4"}],
+    "summary": "Untrusted search path in ssh-agent (OpenSSH before 7.4) lets a forwarded agent socket load attacker-chosen PKCS#11 modules.",
+    "exploit_path": "Attacker who can reach a forwarded agent socket on a compromised host loads a malicious library into the victim's agent process, gaining code execution as that user.",
+    "remediation": "Upgrade OpenSSH to a currently supported release; disable agent forwarding (ForwardAgent no) except where strictly required."
+  },
+  {
+    "cve_id": "CVE-2015-3306",
+    "cvss_score": 9.8,
+    "products": ["proftpd"],
+    "affected": [{"min_version": "1.3.5", "max_version_exclusive": "1.3.5.1"}],
+    "summary": "ProFTPD 1.3.5 mod_copy allows unauthenticated clients to copy files on the server via SITE CPFR/CPTO.",
+    "exploit_path": "Unauthenticated attacker copies attacker-influenced content into a web-reachable directory, leading to remote code execution through the web server.",
+    "remediation": "Upgrade ProFTPD to 1.3.5a/1.3.5b or later, or disable mod_copy; restrict FTP exposure to required source ranges."
+  },
+  {
+    "cve_id": "CVE-2017-7494",
+    "cvss_score": 9.8,
+    "products": ["samba"],
+    "affected": [
+      {"min_version": "3.5.0", "max_version_exclusive": "4.4.14"},
+      {"min_version": "4.5.0", "max_version_exclusive": "4.5.10"},
+      {"min_version": "4.6.0", "max_version_exclusive": "4.6.4"}
+    ],
+    "summary": "Samba 3.5.0 through pre-4.6.4 loads a shared library supplied by a client from a writable share (SambaCry).",
+    "exploit_path": "Attacker with write access to any share uploads a shared library and instructs smbd to load it, yielding remote code execution as the smbd process (often root).",
+    "remediation": "Upgrade Samba to 4.4.14, 4.5.10, 4.6.4 or later; as interim mitigation set 'nt pipe support = no' and block SMB at the perimeter."
+  },
+  {
+    "cve_id": "CVE-2019-10149",
+    "cvss_score": 9.8,
+    "products": ["exim"],
+    "affected": [{"min_version": "4.87", "max_version_exclusive": "4.92"}],
+    "summary": "Exim 4.87 to 4.91 improperly validates recipient addresses, allowing command execution as root via a crafted recipient.",
+    "exploit_path": "Remote attacker delivers a crafted recipient address over SMTP, causing the MTA to execute attacker-controlled commands with root privileges.",
+    "remediation": "Upgrade Exim to 4.92 or later; restrict SMTP exposure to required relays."
+  },
+  {
+    "cve_id": "CVE-2021-23017",
+    "cvss_score": 7.7,
+    "products": ["nginx"],
+    "affected": [{"min_version": "0.6.18", "max_version_exclusive": "1.20.1"}],
+    "summary": "Off-by-one in the nginx DNS resolver (0.6.18 to 1.20.0) allows memory overwrite via forged DNS responses.",
+    "exploit_path": "Attacker able to spoof DNS responses to nginx's configured resolver can cause worker crashes and potentially code execution.",
+    "remediation": "Upgrade nginx to 1.20.1 / 1.21.0 or later; use a trusted, authenticated internal DNS resolver."
+  }
+]

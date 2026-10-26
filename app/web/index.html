@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>SecAgent · Assessment Console</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232dd4a0' d='M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>SecAgent</span>
+  </div>
+  <nav class="tabs" aria-label="Sections">
+    <button class="tab" data-view="overview" aria-selected="true">Overview</button>
+    <button class="tab" data-view="assess" aria-selected="false">New assessment</button>
+    <button class="tab" data-view="report" aria-selected="false">Report</button>
+  </nav>
+  <div id="status-pill" class="pill pill-wait" role="status" aria-live="polite"><i class="dot"></i><span>Checking API…</span></div>
+</header>
+
+<main>
+  <section id="view-overview" class="view">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Security assessment console</p>
+        <h1>Map exposed services to known vulnerabilities, with a fix plan you can act on.</h1>
+        <p class="lead">SecAgent scans an authorised host, identifies service versions, matches them against a local CVE knowledge base, and returns a prioritised remediation plan. Every result is labelled with how it was obtained and how far it has been verified.</p>
+      </div>
+      <button class="btn btn-primary" data-goto="assess">New assessment</button>
+    </div>
+
+    <div class="cards" id="sys-cards">
+      <div class="card"><span class="label">API</span><strong id="c-api">—</strong><small id="c-api-sub">Waiting for /health</small></div>
+      <div class="card"><span class="label">Tool mode</span><strong id="c-mode">—</strong><small id="c-mode-sub"></small></div>
+      <div class="card"><span class="label">Configured pipeline</span><strong id="c-pipe">—</strong><small id="c-pipe-sub"></small></div>
+    </div>
+
+    <h2 class="section-title">Latest assessment <span class="muted">this browser session</span></h2>
+    <div id="overview-last"></div>
+
+    <h2 class="section-title">How to read results</h2>
+    <div class="panel legend">
+      <div><span class="badge badge-info">Version-matched</span><p>The detected product and version fall inside a vulnerable range in the local CVE knowledge base. It is a lead to verify, not a proven exploit.</p></div>
+      <div><span class="badge badge-muted">Not retested</span><p>SecAgent does not re-scan after fixes. Each remediation step shows retest status honestly until you re-run the assessment.</p></div>
+      <div><span class="badge badge-warn">Mock data</span><p>In mock mode, results come from built-in fixtures. No packets are sent to the target.</p></div>
+    </div>
+  </section>
+
+  <section id="view-assess" class="view" hidden>
+    <h1 class="page-title">New security assessment</h1>
+    <div class="notice notice-warn"><strong>Authorised testing only.</strong> Scan only systems you own or have explicit written permission to assess. Unauthorised scanning may be illegal.</div>
+
+    <form id="scan-form" class="panel form" novalidate>
+      <label for="f-target">Target IP address</label>
+      <input id="f-target" name="target" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="e.g. 10.10.10.3" aria-describedby="t-help">
+      <p id="t-help" class="help">IPv4 or IPv6 address. Hostnames and CIDR ranges are not accepted.</p>
+      <div id="fixtures" class="fixtures" hidden></div>
+
+      <label for="f-ports">Ports</label>
+      <input id="f-ports" name="ports" type="text" autocomplete="off" spellcheck="false" value="1-1024" aria-describedby="p-help">
+      <p id="p-help" class="help">For example <code>22,80,443</code> or <code>1-1024</code>.</p>
+
+      <details class="raw">
+        <summary>Analyse existing nmap output instead (optional)</summary>
+        <textarea id="f-raw" rows="6" spellcheck="false" placeholder="Paste nmap output (-oN text or -oX XML) for ONE host. When provided, SecAgent parses it and does not scan."></textarea>
+      </details>
+
+      <label class="check"><input id="f-auth" type="checkbox"><span>I confirm I am authorised to assess this target.</span></label>
+
+      <div id="form-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="actions">
+        <button id="submit" class="btn btn-primary" type="submit"><span class="spinner" hidden></span><span id="submit-label">Run assessment</span></button>
+        <span id="busy-note" class="help" hidden>Running. This can take up to a few minutes.</span>
+      </div>
+    </form>
+  </section>
+
+  <section id="view-report" class="view" hidden><div id="report-root"></div></section>
+</main>
+
+<footer>Independent portfolio project. Not affiliated with or endorsed by Entersoft Security. Findings are leads for human verification.</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

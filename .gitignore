@@ -1,0 +1,32 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+reports/
+# NOTE: app/data/ (CVE database) and app/web/static/ (dashboard JS/CSS) MUST be committed.
+# If a global/template rule such as 'data/' or 'static/' ignores them, these lines re-include them:
+!app/data/
+!app/data/cve_db.json
+!app/web/
+!app/web/static/
+
+# Python virtual environments
+venv/
+.venv/
+
+# Python cache and test files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env .example
+
+# Generated reports and local data
+reports/
