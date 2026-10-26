@@ -1,116 +1,267 @@
-# SecAgent-Core
+# SecAgent
 
-FastAPI service that scans an **authorised** host with Nmap, parses the real XML output, matches the detected
-service versions to a small local CVE knowledge base, and returns a structured threat report with a
-conservative remediation plan. Optional LLM agents (CrewAI) can run the same tools, but **scanning never depends on an LLM**.
+**Automated security assessment with Nmap, FastAPI, and deterministic CVE matching**
 
-## How a scan works
+SecAgent is a Python application that scans an authorized single host with Nmap, parses the scan's XML output, compares detected service-version evidence with a small local CVE knowledge base, and produces a structured report with remediation guidance.
+
+The core scan and analysis workflow does **not** require an LLM API key. An optional CrewAI-based agent layer is available, but the deterministic workflow is the reliable baseline; the optional LLM path should be treated as experimental until validated end to end.
+
+> **Use responsibly:** Scan only systems you own or have explicit permission to assess. Live scans are restricted to private, loopback, or link-local IP addresses that are also included in the configured allow-list.
+
+## What it does
+
+- **Runs Nmap scans** through a FastAPI service, using validated targets and ports.
+- **Parses real Nmap XML output** to extract open TCP ports and service details.
+- **Matches service-version evidence** against a curated local CVE knowledge base.
+- **Generates remediation guidance** and exports structured JSON and Markdown reports.
+- **Supports mock mode** for demos and tests without running a network scan.
+- **Keeps scan evidence separate from analysis mode**, so a real scan is not confused with mock data or with whether an LLM was used.
+
+## How the workflow works
+
+```text
+Request
+  ↓
+Validate target and ports
+  ↓
+Check live-scan scope and allow-list
+  ↓
+Run Nmap (live mode) OR load a fixture (mock mode)
+  ↓
+Parse Nmap XML into open-port and service observations
+  ↓
+Compare available service/version evidence with local CVE entries
+  ↓
+Build remediation guidance and a structured report
+  ↓
+Return the API response and save JSON/Markdown reports
 ```
-POST /api/v1/scan  ->  validate request  ->  scope check (private + allow-listed + port cap)
-   -> nmap_scan: subprocess argv list, shell=False, `-oX -`, timeout   (live mode)
-      or built-in fixtures                                              (mock mode)
-   -> parse XML: open ports + services are taken ONLY from nmap
-   -> version-match against local CVE KB -> report (ThreatReport) -> JSON response + reports/<id>.{json,md}
-```
-The response says **where the data came from**, separately from **which pipeline analysed it**:
 
-| Field | Values | Meaning |
-|---|---|---|
-| `data_source` | `live_nmap` / `mock_fixture` / `provided_scan_data` | Where the observations came from |
-| `real_scan` | `true` only for `live_nmap` | A real nmap process ran for this request |
-| `scan_evidence` | present only for `live_nmap` | nmap version, exact command, exit code, elapsed time, hosts up |
-| `execution_mode` | `agentic` / `deterministic_fallback` | Which analysis pipeline ran (the name is historical: "deterministic_fallback" with `live_nmap` is still a **real** scan analysed without an LLM) |
+### Understanding the report fields
 
-The schema enforces the labels (`real_scan` and `scan_evidence` cannot be set unless `data_source == "live_nmap"`).
-A failed scan returns an HTTP error (`403` out of scope, `422` invalid, `502` nmap failed/bad output, `503` nmap missing,
-`504` timeout). **Failures never fall back to mock data.**
+| Field | Meaning |
+|---|---|
+| `data_source` | Where observations came from: `live_nmap`, `mock_fixture`, or `provided_scan_data`. |
+| `real_scan` | `true` only when an actual Nmap process ran for the request. |
+| `scan_evidence` | Evidence for live scans, such as Nmap version, command, exit code, and elapsed time. |
+| `execution_mode` | Analysis pipeline used: `agentic` or `deterministic_fallback`. A real Nmap scan can still be analyzed by the deterministic pipeline. |
+| `identified_cves` | CVE candidates matched by the current local knowledge base; these are not confirmed vulnerabilities. |
+| `recommended_remediation_plan` | Suggested actions derived from the available analysis and remediation data. |
 
-## Windows setup (PowerShell)
-1. Install **Python 3.10+** (python.org; tick "Add python.exe to PATH") and **Nmap** from https://nmap.org/download (Windows installer; this also offers Npcap). SecAgent uses a TCP connect scan (`-sT`), so it needs no administrator rights.
-2. In the project folder:
+A failed live scan returns an error instead of silently substituting mock results.
+
+## Tech stack
+
+- **Language:** Python
+- **API:** FastAPI, Uvicorn
+- **Scanning:** Nmap
+- **Parsing:** Nmap XML
+- **Analysis:** Deterministic service/version matching against a local CVE knowledge base
+- **Optional agent layer:** CrewAI and an LLM provider
+- **Testing:** pytest
+
+## Setup on Windows
+
+### 1. Install prerequisites
+
+- Python 3.10 or newer
+- Nmap for Windows: https://nmap.org/download
+
+During Nmap installation, follow its installer instructions. SecAgent uses a TCP connect scan (`-sT`).
+
+### 2. Open the project folder in PowerShell
+
+Create and activate a virtual environment:
+
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1            # if blocked: Set-ExecutionPolicy -Scope Process Bypass
-pip install -r requirements-dev.txt
-Copy-Item .env.example .env
-nmap --version                           # if "not recognised", set SECAGENT_NMAP_PATH in .env
-python -m pytest -q                      # all tests mock subprocess; no scan, no network
+.\.venv\Scripts\Activate.ps1
 ```
 
-## Run
-**Demo (mock, default):** nothing is scanned; results are labelled `mock_fixture`.
+If PowerShell blocks activation for the current terminal, you can run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Install development dependencies:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+```
+
+Create a local environment file from the example:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Check that Nmap is available:
+
+```powershell
+nmap --version
+```
+
+If the command is not found, configure `SECAGENT_NMAP_PATH` in `.env` with the path to `nmap.exe`. For example:
+
+```dotenv
+SECAGENT_NMAP_PATH='C:\Program Files (x86)\Nmap\nmap.exe'
+```
+
+Do not commit `.env` or put real API keys in `.env.example`.
+
+### 3. Run the tests
+
+```powershell
+python -m pytest -q
+```
+
+The test suite mocks scan subprocesses where appropriate, so running tests does not require scanning a real host.
+
+## Run the application
+
+From the project root, start the server:
+
 ```powershell
 python -m uvicorn app.main:app --reload
 ```
-**Real scan of your own machine or lab:** edit `.env`:
-```
+
+Open these local addresses in your browser:
+
+- Dashboard: http://127.0.0.1:8000/
+- Interactive API documentation: http://127.0.0.1:8000/docs
+- Health endpoint: http://127.0.0.1:8000/health
+
+The default configuration is **mock mode**. Mock mode uses fixtures and does not scan a host.
+
+## Run a real scan against an authorized host
+
+1. Open `.env`.
+2. Set live mode and explicitly allow the local machine:
+
+```dotenv
 SECAGENT_TOOL_MODE=live
 SECAGENT_ALLOWED_CIDRS=127.0.0.1/32
 ```
-then start the server and open http://127.0.0.1:8000/ (dashboard) or http://127.0.0.1:8000/docs.
 
-### Environment variables (`SECAGENT_` prefix; see `.env.example`)
-| Variable | Default | Purpose |
-|---|---|---|
-| `TOOL_MODE` | `mock` | `mock` fixtures or `live` nmap |
-| `ALLOWED_CIDRS` | empty | Live targets must be private/loopback **and** inside this list. Empty = every live scan refused |
-| `TOOL_TIMEOUT_S` | 60 | nmap `--host-timeout`; the process is killed 10 s later |
-| `MAX_PORTS` | 2000 | Max ports per scan |
-| `NMAP_PATH` | auto | Optional explicit `nmap.exe`. Otherwise: `shutil.which('nmap')`, then the default Windows install folders (honours `%ProgramFiles(x86)%` / `%ProgramFiles%`) |
-| `NMAP_SKIP_HOST_DISCOVERY` | false | `true` adds `-Pn` for hosts that block ping |
-| `AGENTS_ENABLED` / `LLM_API_KEY` / `LLM_MODEL` | true / blank / `anthropic/claude-sonnet-5-5` | Optional agents; `ANTHROPIC_API_KEY` is also read. A blank key means agents are off |
-| `SCAN_TIMEOUT_S`, `SCAN_MAX_ATTEMPTS`, `MAX_CONCURRENT_SCANS`, `LOG_LEVEL` | 180, 2, 4, INFO | Service limits |
+3. Restart the server after changing the environment.
+4. Submit a scan request for `127.0.0.1` from the dashboard or API.
 
-## API examples
+Example PowerShell request:
+
 ```powershell
-# Health (shows tool mode and configured pipeline)
-Invoke-RestMethod http://127.0.0.1:8000/health
+$body = @{
+    target = "127.0.0.1"
+    ports = "22,80,443,8000-8100"
+    authorization_confirmed = $true
+} | ConvertTo-Json
 
-# Real scan (live mode, allow-listed target)
-$body = @{ target = "127.0.0.1"; ports = "22,80,443,8000-8100"; authorization_confirmed = $true } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/scan -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 8
-
-# Analyse existing nmap output (-oN text or -oX XML, ONE host); nothing is scanned
-$raw = Get-Content scan.xml -Raw
-$body = @{ raw_scan_data = $raw; authorization_confirmed = $true } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/scan -ContentType "application/json" -Body $body
+Invoke-RestMethod `
+    -Method Post `
+    -Uri "http://127.0.0.1:8000/api/v1/scan" `
+    -ContentType "application/json" `
+    -Body $body |
+    ConvertTo-Json -Depth 8
 ```
-### Confirm nmap really ran (not fallback data)
-In the response check: `data_source = "live_nmap"`, `real_scan = true`, and `scan_evidence` (nmap version, the exact
-command ending in your target, `exit_code: 0`, `elapsed_s`). In the dashboard the report shows "Real nmap scan" and the command.
-Cross-check with `Test-NetConnection 127.0.0.1 -Port 8000`, or start a listener (`python -m http.server 8081`) and scan port 8081.
 
-## Troubleshooting: `TOOL_UNAVAILABLE` (Nmap not found) on Windows
-`nmap --version` working in your terminal does not guarantee the **server process** can see Nmap: a terminal or editor opened
-before installing Nmap keeps an old `PATH`. SecAgent therefore also checks the default install folders. To diagnose:
+The example ports are illustrative; the response depends on what is actually listening on the target. A port appearing open does not by itself prove a vulnerability or that the service is exposed beyond the local machine.
+
+### Confirm that a real scan ran
+
+For a live scan, inspect the response for:
+
+- `data_source` set to `live_nmap`
+- `real_scan` set to `true`
+- `scan_evidence` containing the scan command and execution details
+
+If the scan fails, investigate the returned error; the application is designed not to silently fall back to mock data after a failed live scan.
+
+## Analyze existing Nmap output
+
+The API can also analyze provided scan data without launching a new scan. For example, to submit XML saved as `scan.xml`:
+
 ```powershell
-python scripts\check_nmap.py            # prints every location checked, the one found, and runs `nmap --version`
-Invoke-RestMethod http://127.0.0.1:8000/health   # in live mode: "nmap": "found" or "not_found"
-```
-The error text lists what was checked. Fixes, in order: fully stop and restart `uvicorn` (and open a new terminal), or set the full path in `.env`
-using **single quotes or forward slashes**, because inside double quotes `.env` turns `\nmap.exe` into a newline:
-```
-SECAGENT_NMAP_PATH='C:\Program Files (x86)\Nmap\nmap.exe'
-SECAGENT_NMAP_PATH=C:/Program Files (x86)/Nmap/nmap.exe
-```
-If you still see the message `nmap is not installed on this host.`, you are running an **older copy** of SecAgent (that text no longer exists in the code).
+$raw = Get-Content .\scan.xml -Raw
 
-## Safety controls
-- Target must be a single IP (no hostnames, CIDRs or URLs). Live mode additionally requires a private/loopback/link-local address **and** membership in `ALLOWED_CIDRS`; public addresses are always refused.
-- Nmap argv is built in one function from fixed flags plus validated target/ports; there is no way to pass other options. `shell=False`, hard timeout, port cap, output parsed as XML (entity declarations rejected).
-- `authorization_confirmed: true` is required. Secrets are read from the environment, never returned, and redacted from logs.
+$body = @{
+    raw_scan_data = $raw
+    authorization_confirmed = $true
+} | ConvertTo-Json
 
-## Optional: LLM agents and the Anthropic error
-Scans work without any key. To enable agents, set `SECAGENT_LLM_API_KEY` (or `ANTHROPIC_API_KEY`) and run
-`python scripts/check_llm.py`: it sends a 1-token request and prints Anthropic's exact error (never the key).
-A workspace/credential error is an **account** issue (key belongs to a workspace without model access or credits); the script's hints say which HTTP status means what. If agents fail at run time the service falls back to the deterministic pipeline and records a warning.
+Invoke-RestMethod `
+    -Method Post `
+    -Uri "http://127.0.0.1:8000/api/v1/scan" `
+    -ContentType "application/json" `
+    -Body $body |
+    ConvertTo-Json -Depth 8
+```
+
+Use scan data from systems you are authorized to assess.
+
+## Configuration
+
+The application reads configuration from environment variables with the `SECAGENT_` prefix. Check `.env.example` for the project's current configuration names.
+
+| Variable | Purpose |
+|---|---|
+| `SECAGENT_TOOL_MODE` | Selects `mock` or `live` scan mode. |
+| `SECAGENT_ALLOWED_CIDRS` | Allow-list required for live targets. An empty allow-list refuses live scans. |
+| `SECAGENT_TOOL_TIMEOUT_S` | Nmap host timeout. |
+| `SECAGENT_MAX_PORTS` | Maximum number of ports accepted for a scan. |
+| `SECAGENT_NMAP_PATH` | Optional explicit path to `nmap.exe`; otherwise the application attempts to locate Nmap. |
+| `SECAGENT_NMAP_SKIP_HOST_DISCOVERY` | Enables `-Pn` when set to `true`. |
+| `SECAGENT_AGENTS_ENABLED` | Enables the optional agent layer when configured. |
+| `SECAGENT_LLM_API_KEY` / `ANTHROPIC_API_KEY` | Optional LLM credentials. Keep keys private and out of Git. |
+| `SECAGENT_LLM_MODEL` | Optional model identifier for the configured LLM provider. |
+
+Other scan limits and logging settings are documented in `.env.example` and the application configuration.
+
+## Security controls
+
+- Accepts a single IP address rather than a hostname, URL, or CIDR as the scan target.
+- Live scanning requires a private, loopback, or link-local address **and** membership in `SECAGENT_ALLOWED_CIDRS`.
+- Requires `authorization_confirmed: true` in scan requests.
+- Builds Nmap arguments from validated inputs and uses `shell=False`.
+- Applies scan timeouts and a maximum-port limit.
+- Parses XML output while rejecting entity declarations.
+- Reads secrets from environment configuration rather than returning them in scan reports.
+
+The authorization flag is an explicit user attestation, not an authentication system. Keep the service bound to localhost unless you add appropriate authentication and deployment controls.
 
 ## Limitations
-- CVE matching is **version-string matching** against ~9 curated entries. Findings are *candidates to confirm*, not confirmed vulnerabilities: distro backports and spoofed banners cause false positives, and absence of a match does not mean the host is secure. No exploitation or validation is performed; no retest.
-- TCP connect scan only (no UDP, no OS detection, no scripts); `--version-light` favours speed over service-detection depth. A scan that hits the time limit is flagged as possibly incomplete.
-- Single host per assessment; one request at a time per scan; no scan history or authentication (keep it on 127.0.0.1).
-- Remediation text comes from the local knowledge base, not from live vendor advisories. Verified on Linux with Nmap 7.94; the Windows steps above are untested here.
 
-## Layout
-`app/api` routes · `app/schemas` contracts · `app/services` orchestration/analysis · `app/tools` nmap runner, XML parser, guarded tools ·
-`app/agents` optional CrewAI · `app/core` config/scope/validators/logging · `app/web` dashboard · `scripts/check_llm.py`, `scripts/check_nmap.py` · `tests/` (81 tests).
+- The local CVE knowledge base is small (approximately nine curated entries) and matching is based on available service/version strings. Coverage is incomplete.
+- A CVE match is a **candidate for further verification**, not proof that a system is vulnerable. Distribution patches, inaccurate banners, and other factors can affect results.
+- No exploitation, independent vulnerability validation, or automated retest is performed.
+- The scan workflow uses TCP connect scanning; it does not perform UDP scanning, OS detection, or Nmap scripting.
+- Service/version detection may be incomplete. No CVE match does not mean the host is secure.
+- Remediation guidance is based on the local knowledge base and generic hardening logic, not live vendor advisories.
+- The optional LLM-agent workflow should not be represented as fully validated unless it has been tested with a real configured model and its tool calls.
+
+## Project structure
+
+```text
+app/
+  api/          API routes
+  schemas/      Request and response models
+  services/     Scan orchestration, analysis, and reporting
+  tools/        Nmap runner, XML parser, and guarded tools
+  agents/       Optional CrewAI agent integration
+  core/         Configuration, scope checks, validation, and logging
+  web/          Dashboard
+scripts/        Nmap and optional LLM diagnostic scripts
+tests/          Automated tests
+```
+
+## Future improvements
+
+- Expand CVE coverage and improve service identification using stronger evidence such as CPE data.
+- Make unsupported services and missing version evidence explicit in reports.
+- Improve the separation between CVE-specific remediation and general hardening guidance.
+- Validate the optional agent layer end to end and add integration tests for tool use.
+- Add authenticated access and scan-history management before considering shared or remote deployment.
+
+---
+
+**Status:** The deterministic scan-and-report workflow is the core of the project. Optional LLM-agent capabilities are an extension, not a requirement for scanning.
