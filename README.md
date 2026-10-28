@@ -8,6 +8,16 @@ The core scan and analysis workflow does **not** require an LLM API key. An opti
 
 > **Use responsibly:** Scan only systems you own or have explicit permission to assess. Live scans are restricted to private, loopback, or link-local IP addresses that are also included in the configured allow-list.
 
+## 🚀 Live Demo
+
+**Live Application:** https://secagent-kc32.onrender.com
+
+**API Documentation:** https://secagent-kc32.onrender.com/docs
+
+**Health Check:** https://secagent-kc32.onrender.com/health
+
+The application is deployed on Render. The public demo uses mock scan fixtures to demonstrate the deterministic assessment pipeline without sending network packets to the target.
+
 ## What it does
 
 - **Runs Nmap scans** through a FastAPI service, using validated targets and ports.
